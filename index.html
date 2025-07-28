@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>3D Bioprinter Simulation</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
     <style>
         body { margin: 0; overflow: hidden; font-family: 'Inter', sans-serif; background-color: #1a1a2e; color: #e0e0e0; }
         canvas { display: block; }
@@ -18,6 +19,69 @@
             color: #e0e0e0;
             font-size: 14px;
             z-index: 10;
+            display: flex; /* Use flex for layout */
+            flex-direction: column;
+            gap: 10px; /* Spacing between header and content */
+            transition: all 0.3s ease-out; /* Smooth transitions for panel movement/size */
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer; /* Indicate it's clickable */
+            padding-bottom: 5px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            margin-bottom: 5px;
+        }
+
+        .panel-header h3, .panel-header h4 {
+            margin: 0;
+            padding: 0;
+            font-size: 16px;
+            color: #e0e0e0;
+        }
+
+        .toggle-button {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 50%;
+            transition: transform 0.3s ease;
+        }
+
+        .toggle-button:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .panel-content {
+            max-height: 500px; /* A large enough value to show content */
+            opacity: 1;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out, opacity 0.3s ease-out;
+            display: flex;
+            flex-direction: column;
+            gap: 10px; /* Spacing for internal elements */
+        }
+
+        .panel.collapsed .panel-content {
+            max-height: 0;
+            opacity: 0;
+            padding-top: 0;
+            padding-bottom: 0;
+            margin-top: 0;
+            margin-bottom: 0;
+        }
+
+        .panel.collapsed .toggle-button {
+            transform: rotate(-90deg); /* Rotate for collapsed state */
         }
 
         #info-panel {
@@ -30,25 +94,29 @@
             bottom: 20px;
             left: 50%;
             transform: translateX(-50%);
-            display: flex;
+            display: flex; /* Override flex-direction from .panel for horizontal buttons */
+            flex-direction: row; /* Horizontal layout for buttons */
             gap: 10px;
         }
+        /* Ensure controls-panel content is also flex for its buttons */
+        #controls-panel .panel-content {
+            display: flex;
+            flex-direction: row;
+            flex-wrap: wrap; /* Allow buttons to wrap */
+            justify-content: center;
+            gap: 10px;
+        }
+
 
         #settings-panel {
             top: 10px;
             right: 10px;
             width: 250px;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
         }
 
         #camera-panel {
             bottom: 20px;
-            right: 10px;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
+right: 10px;
         }
 
         /* Button Styling */
@@ -156,56 +224,145 @@
             font-size: 20px;
             cursor: pointer;
         }
+
+        /* Mobile specific adjustments */
+        @media (max-width: 768px) {
+            .panel {
+                width: calc(100% - 40px); /* Full width minus padding */
+                left: 20px;
+                right: 20px;
+                margin-bottom: 10px; /* Space between stacked panels */
+                padding: 10px;
+            }
+
+            #info-panel {
+                top: 10px;
+                left: 10px;
+                right: 10px;
+                max-width: unset; /* Remove max-width for mobile */
+            }
+
+            #controls-panel {
+                bottom: unset; /* Remove bottom positioning */
+                top: 10px; /* Stack below info panel */
+                left: 50%;
+                transform: translateX(-50%);
+                width: calc(100% - 40px);
+                flex-direction: column; /* Stack buttons vertically on mobile */
+                align-items: center;
+                gap: 5px;
+            }
+             #controls-panel .panel-content {
+                flex-direction: column; /* Stack buttons vertically on mobile */
+                align-items: center;
+            }
+
+            #settings-panel {
+                top: unset; /* Remove top positioning */
+                bottom: 10px; /* Stack at bottom */
+                left: 10px;
+                right: 10px;
+                width: calc(100% - 40px);
+            }
+
+            #camera-panel {
+                bottom: unset; /* Remove bottom positioning */
+                top: 10px; /* Stack below controls or info */
+                left: 10px;
+                right: 10px;
+                width: calc(100% - 40px);
+            }
+
+            /* Stack panels vertically for mobile */
+            #info-panel { order: 1; }
+            #controls-panel { order: 2; top: calc(10px + var(--info-panel-height, 0px) + 10px); } /* Dynamic top based on info panel height */
+            #settings-panel { order: 3; top: calc(10px + var(--info-panel-height, 0px) + var(--controls-panel-height, 0px) + 20px); }
+            #camera-panel { order: 4; top: calc(10px + var(--info-panel-height, 0px) + var(--controls-panel-height, 0px) + var(--settings-panel-height, 0px) + 30px); }
+
+            /* Default to collapsed on mobile */
+            .panel:not(#message-box-overlay) { /* Exclude message box from initial collapse */
+                max-height: 50px; /* Height when collapsed */
+                overflow: hidden;
+            }
+            .panel:not(#message-box-overlay) .panel-content {
+                max-height: 0;
+                opacity: 0;
+            }
+            .panel:not(#message-box-overlay) .toggle-button {
+                transform: rotate(-90deg);
+            }
+        }
     </style>
 </head>
 <body>
     <div id="info-panel" class="panel">
-        <h3>3D Bioprinter Simulation</h3>
-        <p>Use your mouse to rotate (left-click + drag), pan (right-click + drag), and zoom (scroll wheel) the camera.</p>
-        <p>Press 'M' to toggle manual print head control. Use WASD (X/Z) and Q/E (Y) keys to move the head manually.</p>
+        <div class="panel-header">
+            <h3>3D Bioprinter Simulation</h3>
+            <button class="toggle-button">&ndash;</button>
+        </div>
+        <div class="panel-content">
+            <p>Use your mouse to rotate (left-click + drag), pan (right-click + drag), and zoom (scroll wheel) the camera.</p>
+            <p>Press 'M' to toggle manual print head control. Use WASD (X/Z) and Q/E (Y) keys to move the head manually.</p>
+        </div>
     </div>
 
     <div id="controls-panel" class="panel">
-        <button id="startButton">Start Print</button>
-        <button id="stopButton">Stop Print</button>
-        <button id="toggleManualControl">Toggle Manual Control (M)</button>
+        <div class="panel-header">
+            <h4>Controls</h4>
+            <button class="toggle-button">&ndash;</button>
+        </div>
+        <div class="panel-content">
+            <button id="startButton">Start Print</button>
+            <button id="stopButton">Stop Print</button>
+            <button id="toggleManualControl">Toggle Manual Control (M)</button>
+        </div>
     </div>
 
     <div id="settings-panel" class="panel">
-        <h4>Print Settings</h4>
-        <div class="input-group">
-            <label for="printSpeedSlider">Print Speed:</label>
-            <input type="range" id="printSpeedSlider" min="0.001" max="0.02" step="0.001" value="0.005">
-            <span id="printSpeedValue">0.005</span>
+        <div class="panel-header">
+            <h4>Print Settings</h4>
+            <button class="toggle-button">&ndash;</button>
         </div>
-        <div class="input-group">
-            <label for="layerHeightSlider">Layer Height:</label>
-            <input type="range" id="layerHeightSlider" min="0.05" max="0.5" step="0.01" value="0.1">
-            <span id="layerHeightValue">0.1</span>
+        <div class="panel-content">
+            <div class="input-group">
+                <label for="printSpeedSlider">Print Speed:</label>
+                <input type="range" id="printSpeedSlider" min="0.001" max="0.02" step="0.001" value="0.005">
+                <span id="printSpeedValue">0.005</span>
+            </div>
+            <div class="input-group">
+                <label for="layerHeightSlider">Layer Height:</label>
+                <input type="range" id="layerHeightSlider" min="0.05" max="0.5" step="0.01" value="0.1">
+                <span id="layerHeightValue">0.1</span>
+            </div>
+            <div class="input-group">
+                <label for="totalLayersInput">Total Layers:</label>
+                <input type="number" id="totalLayersInput" min="1" max="50" value="10">
+            </div>
+            <div class="input-group">
+                <label for="printModelSelect">Print Model:</label>
+                <select id="printModelSelect">
+                    <option value="spiral">Spiral (Demo)</option>
+                    <option value="cube">Cube</option>
+                    <option value="sphere">Sphere</option>
+                    <option value="cylinder">Cylinder</option>
+                </select>
+            </div>
+            <button id="resetPrintButton">Reset Print</button>
+            <button id="simulateErrorButton">Simulate Error</button>
         </div>
-        <div class="input-group">
-            <label for="totalLayersInput">Total Layers:</label>
-            <input type="number" id="totalLayersInput" min="1" max="50" value="10">
-        </div>
-        <div class="input-group">
-            <label for="printModelSelect">Print Model:</label>
-            <select id="printModelSelect">
-                <option value="spiral">Spiral (Demo)</option>
-                <option value="cube">Cube</option>
-                <option value="sphere">Sphere</option>
-                <option value="cylinder">Cylinder</option>
-            </select>
-        </div>
-        <button id="resetPrintButton">Reset Print</button>
-        <button id="simulateErrorButton">Simulate Error</button>
     </div>
 
     <div id="camera-panel" class="panel">
-        <h4>Camera Presets</h4>
-        <button id="resetViewButton">Reset View</button>
-        <button id="frontViewButton">Front View</button>
-        <button id="topViewButton">Top View</button>
-        <button id="isometricViewButton">Isometric View</button>
+        <div class="panel-header">
+            <h4>Camera Presets</h4>
+            <button class="toggle-button">&ndash;</button>
+        </div>
+        <div class="panel-content">
+            <button id="resetViewButton">Reset View</button>
+            <button id="frontViewButton">Front View</button>
+            <button id="topViewButton">Top View</button>
+            <button id="isometricViewButton">Isometric View</button>
+        </div>
     </div>
 
     <!-- Custom Message Box -->
@@ -432,6 +589,30 @@
 
             // Message box close button
             document.getElementById('message-box-close').addEventListener('click', hideMessageBox);
+
+            // Add collapsible functionality
+            document.querySelectorAll('.panel').forEach(panel => {
+                const header = panel.querySelector('.panel-header');
+                const toggleButton = panel.querySelector('.toggle-button');
+
+                if (header && toggleButton) {
+                    header.addEventListener('click', () => {
+                        panel.classList.toggle('collapsed');
+                        toggleButton.textContent = panel.classList.contains('collapsed') ? '+' : '–';
+                    });
+                }
+            });
+
+            // Collapse panels by default on mobile
+            if (window.innerWidth <= 768) {
+                document.querySelectorAll('.panel:not(#message-box-overlay)').forEach(panel => {
+                    panel.classList.add('collapsed');
+                    const toggleButton = panel.querySelector('.toggle-button');
+                    if (toggleButton) {
+                        toggleButton.textContent = '+';
+                    }
+                });
+            }
         }
 
         // Function to handle window resizing
@@ -439,7 +620,59 @@
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
+
+            // Recalculate panel positions for mobile if needed
+            if (window.innerWidth <= 768) {
+                updateMobilePanelPositions();
+            } else {
+                // Reset to desktop positions if resizing to desktop from mobile
+                document.getElementById('info-panel').style.top = '10px';
+                document.getElementById('info-panel').style.left = '10px';
+                document.getElementById('info-panel').style.right = 'unset';
+                document.getElementById('info-panel').style.maxWidth = '300px';
+
+                document.getElementById('controls-panel').style.top = 'unset';
+                document.getElementById('controls-panel').style.bottom = '20px';
+                document.getElementById('controls-panel').style.left = '50%';
+                document.getElementById('controls-panel').style.transform = 'translateX(-50%)';
+                document.getElementById('controls-panel').style.width = 'unset';
+                document.getElementById('controls-panel').style.flexDirection = 'row';
+
+                document.getElementById('settings-panel').style.bottom = 'unset';
+                document.getElementById('settings-panel').style.top = '10px';
+                document.getElementById('settings-panel').style.right = '10px';
+                document.getElementById('settings-panel').style.left = 'unset';
+                document.getElementById('settings-panel').style.width = '250px';
+
+                document.getElementById('camera-panel').style.top = 'unset';
+                document.getElementById('camera-panel').style.bottom = '20px';
+                document.getElementById('camera-panel').style.right = '10px';
+                document.getElementById('camera-panel').style.left = 'unset';
+                document.getElementById('camera-panel').style.width = 'unset';
+
+                // Ensure panels are not collapsed by default on desktop
+                document.querySelectorAll('.panel').forEach(panel => {
+                    panel.classList.remove('collapsed');
+                    const toggleButton = panel.querySelector('.toggle-button');
+                    if (toggleButton) {
+                        toggleButton.textContent = '–';
+                    }
+                });
+            }
         }
+
+        function updateMobilePanelPositions() {
+            const infoPanel = document.getElementById('info-panel');
+            const controlsPanel = document.getElementById('controls-panel');
+            const settingsPanel = document.getElementById('settings-panel');
+            const cameraPanel = document.getElementById('camera-panel');
+
+            // Set CSS variables for panel heights
+            document.documentElement.style.setProperty('--info-panel-height', infoPanel.offsetHeight + 'px');
+            document.documentElement.style.setProperty('--controls-panel-height', controlsPanel.offsetHeight + 'px');
+            document.documentElement.style.setProperty('--settings-panel-height', settingsPanel.offsetHeight + 'px');
+        }
+
 
         // Function to generate path points for different models
         function generatePathForModel(model, progress) {
@@ -569,7 +802,7 @@
                 const index = printedPointCount * 3;
                 positions[index] = x;
                 // Adjusted vertical offset from 0.05 to 0.01 to decrease distance from nozzle
-                positions[index + 1] = y - EXTRUDER_HEIGHT_OFFSET + 0.01; 
+                positions[index + 1] = y - EXTRUDER_HEIGHT_OFFSET + 0.01;
                 positions[index + 2] = z;
                 printedPointCount++;
                 printedPointsGeometry.setDrawRange(0, printedPointCount);
@@ -687,6 +920,10 @@
         window.onload = function () {
             init();
             animate();
+            // Initial call to set mobile panel positions correctly
+            if (window.innerWidth <= 768) {
+                updateMobilePanelPositions();
+            }
         };
     </script>
 </body>
