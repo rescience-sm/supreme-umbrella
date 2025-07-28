@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Bioprinter Simulation</title>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: 'Inter', sans-serif; background-color: #1a1a2e; color: #e0e0e0; }
+        canvas { display: block; }
+
+        /* Panel Styling */
+        .panel {
+            position: absolute;
+            background-color: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            color: #e0e0e0;
+            font-size: 14px;
+            z-index: 10;
+        }
+
+        #info-panel {
+            top: 10px;
+            left: 10px;
+            max-width: 300px;
+        }
+
+        #controls-panel {
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 10px;
+        }
+
+        #settings-panel {
+            top: 10px;
+            right: 10px;
+            width: 250px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        #camera-panel {
+            bottom: 20px;
+            right: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        /* Button Styling */
+        button {
+            background: linear-gradient(145deg, #6a11cb, #2575fc);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        button:hover {
+            background: linear-gradient(145deg, #2575fc, #6a11cb);
+            box-shadow: 0 6px 10px rgba(0, 0, 0, 0.2);
+            transform: translateY(-2px);
+        }
+        button:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Input and Label Styling */
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        .input-group label {
+            font-size: 13px;
+            color: #b0b0b0;
+        }
+        .input-group input[type="range"],
+        .input-group input[type="number"],
+        .input-group select {
+            width: 100%;
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #444;
+            background-color: #333;
+            color: #e0e0e0;
+            -webkit-appearance: none; /* Remove default styling for range input */
+            appearance: none;
+            cursor: pointer;
+        }
+        .input-group input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            background: #2575fc;
+            cursor: pointer;
+            box-shadow: 0 0 2px rgba(0, 0, 0, 0.3);
+        }
+        .input-group input[type="range"]::-moz-range-thumb {
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            background: #2575fc;
+            cursor: pointer;
+            box-shadow: 0 0 2px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Message Box Styling */
+        #message-box-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            visibility: hidden;
+            opacity: 0;
+            transition: visibility 0s, opacity 0.3s ease;
+        }
+        #message-box-overlay.visible {
+            visibility: visible;
+            opacity: 1;
+        }
+        #message-box {
+            background-color: #2a2a4a;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+            text-align: center;
+            max-width: 400px;
+            color: #e0e0e0;
+            position: relative;
+        }
+        #message-box-close {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: none;
+            border: none;
+            color: #e0e0e0;
+            font-size: 20px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div id="info-panel" class="panel">
+        <h3>3D Bioprinter Simulation</h3>
+        <p>Use your mouse to rotate (left-click + drag), pan (right-click + drag), and zoom (scroll wheel) the camera.</p>
+        <p>Press 'M' to toggle manual print head control. Use WASD (X/Z) and Q/E (Y) keys to move the head manually.</p>
+    </div>
+
+    <div id="controls-panel" class="panel">
+        <button id="startButton">Start Print</button>
+        <button id="stopButton">Stop Print</button>
+        <button id="toggleManualControl">Toggle Manual Control (M)</button>
+    </div>
+
+    <div id="settings-panel" class="panel">
+        <h4>Print Settings</h4>
+        <div class="input-group">
+            <label for="printSpeedSlider">Print Speed:</label>
+            <input type="range" id="printSpeedSlider" min="0.001" max="0.02" step="0.001" value="0.005">
+            <span id="printSpeedValue">0.005</span>
+        </div>
+        <div class="input-group">
+            <label for="layerHeightSlider">Layer Height:</label>
+            <input type="range" id="layerHeightSlider" min="0.05" max="0.5" step="0.01" value="0.1">
+            <span id="layerHeightValue">0.1</span>
+        </div>
+        <div class="input-group">
+            <label for="totalLayersInput">Total Layers:</label>
+            <input type="number" id="totalLayersInput" min="1" max="50" value="10">
+        </div>
+        <div class="input-group">
+            <label for="printModelSelect">Print Model:</label>
+            <select id="printModelSelect">
+                <option value="spiral">Spiral (Demo)</option>
+                <option value="cube">Cube</option>
+                <option value="sphere">Sphere</option>
+                <option value="cylinder">Cylinder</option>
+            </select>
+        </div>
+        <button id="resetPrintButton">Reset Print</button>
+        <button id="simulateErrorButton">Simulate Error</button>
+    </div>
+
+    <div id="camera-panel" class="panel">
+        <h4>Camera Presets</h4>
+        <button id="resetViewButton">Reset View</button>
+        <button id="frontViewButton">Front View</button>
+        <button id="topViewButton">Top View</button>
+        <button id="isometricViewButton">Isometric View</button>
+    </div>
+
+    <!-- Custom Message Box -->
+    <div id="message-box-overlay">
+        <div id="message-box">
+            <button id="message-box-close">&times;</button>
+            <p id="message-box-content"></p>
+        </div>
+    </div>
+
+    <!-- Online references for Three.js and OrbitControls.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Using a compatible OrbitControls.js that exposes THREE.OrbitControls globally -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script>
+        // Global variables for Three.js scene
+        let scene, camera, renderer, controls;
+        let bioprinter, extruderHead, printedObject;
+        let animationId;
+
+        // Print simulation state
+        let isPrinting = false;
+        let manualControlMode = false;
+        let printProgress = 0;
+        let currentLayer = 0;
+        let currentPathPoints = []; // Stores points for the current layer's path
+
+        // Customizable print parameters
+        let printSpeed = 0.005;
+        let layerHeight = 0.1;
+        let totalLayers = 10;
+        let currentPrintModel = 'spiral'; // Default model
+
+        // Constants for printer dimensions
+        const BED_SIZE = 5; // 5x5 bed
+        const EXTRUDER_HEIGHT_OFFSET = 2.4; // Initial Y position of extruder relative to bed
+
+        // Printed material visualization
+        let printedPointsGeometry;
+        let printedPointsMesh;
+        const MAX_PRINT_POINTS = 50000; // Pre-allocate buffer for printed points
+
+        // Function to initialize the 3D scene
+        function init() {
+            // Scene setup
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x1a1a2e); // Dark background
+
+            // Camera setup
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(5, 5, 5); // Initial camera position
+
+            // Renderer setup
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
+
+            // OrbitControls for camera interaction
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true; // Smooth camera movement
+            controls.dampingFactor = 0.05;
+            controls.screenSpacePanning = false;
+            controls.minDistance = 2;
+            controls.maxDistance = 20;
+            controls.maxPolarAngle = Math.PI / 2; // Prevent camera from going below the ground
+
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0x404040, 2); // Soft white light
+            scene.add(ambientLight);
+
+            const directionalLight1 = new THREE.DirectionalLight(0xffffff, 1);
+            directionalLight1.position.set(5, 10, 7);
+            scene.add(directionalLight1);
+
+            const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight2.position.set(-5, 10, -7);
+            scene.add(directionalLight2);
+
+            // Create Bioprinter Model
+            bioprinter = new THREE.Group();
+            scene.add(bioprinter);
+
+            // Base of the printer
+            const baseGeometry = new THREE.BoxGeometry(6, 0.2, 6);
+            const baseMaterial = new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.7, metalness: 0.1 });
+            const base = new THREE.Mesh(baseGeometry, baseMaterial);
+            base.position.y = -0.1; // Place it slightly below the origin
+            bioprinter.add(base);
+
+            // Printer Bed (where printing happens)
+            const bedGeometry = new THREE.PlaneGeometry(BED_SIZE, BED_SIZE);
+            const bedMaterial = new THREE.MeshStandardMaterial({ color: 0x222222, side: THREE.DoubleSide, roughness: 0.8, metalness: 0.1 });
+            const bed = new THREE.Mesh(bedGeometry, bedMaterial);
+            bed.rotation.x = -Math.PI / 2; // Rotate to be horizontal
+            bed.position.y = 0.01; // Slightly above the base
+            bioprinter.add(bed);
+
+            // Gantry (frame holding the extruder)
+            const gantryMaterial = new THREE.MeshStandardMaterial({ color: 0x555555, roughness: 0.6, metalness: 0.2 });
+
+            // Vertical posts
+            const postGeometry = new THREE.BoxGeometry(0.2, 3, 0.2);
+            const post1 = new THREE.Mesh(postGeometry, gantryMaterial);
+            post1.position.set(-BED_SIZE/2, 1.5, -BED_SIZE/2);
+            bioprinter.add(post1);
+
+            const post2 = new THREE.Mesh(postGeometry, gantryMaterial);
+            post2.position.set(BED_SIZE/2, 1.5, -BED_SIZE/2);
+            bioprinter.add(post2);
+
+            const post3 = new THREE.Mesh(postGeometry, gantryMaterial);
+            post3.position.set(-BED_SIZE/2, 1.5, BED_SIZE/2);
+            bioprinter.add(post3);
+
+            const post4 = new THREE.Mesh(postGeometry, gantryMaterial);
+            post4.position.set(BED_SIZE/2, 1.5, BED_SIZE/2);
+            bioprinter.add(post4);
+
+            // Top horizontal beams
+            const beamGeometry = new THREE.BoxGeometry(BED_SIZE + 0.4, 0.2, 0.2); // Slightly wider to connect posts
+            const beam1 = new THREE.Mesh(beamGeometry, gantryMaterial);
+            beam1.position.set(0, 3, -BED_SIZE/2);
+            bioprinter.add(beam1);
+
+            const beam2 = new THREE.Mesh(beamGeometry, gantryMaterial);
+            beam2.position.set(0, 3, BED_SIZE/2);
+            bioprinter.add(beam2);
+
+            const crossBeamGeometry = new THREE.BoxGeometry(0.2, 0.2, BED_SIZE + 0.4);
+            const crossBeam1 = new THREE.Mesh(crossBeamGeometry, gantryMaterial);
+            crossBeam1.position.set(-BED_SIZE/2, 3, 0);
+            bioprinter.add(crossBeam1);
+
+            const crossBeam2 = new THREE.Mesh(crossBeamGeometry, gantryMaterial);
+            crossBeam2.position.set(BED_SIZE/2, 3, 0);
+            bioprinter.add(crossBeam2);
+
+            // Moving Gantry (X-axis) - Simplified for visual representation
+            const xGantryGeometry = new THREE.BoxGeometry(BED_SIZE, 0.1, 0.1);
+            const xGantryMaterial = new THREE.MeshStandardMaterial({ color: 0x777777, roughness: 0.5, metalness: 0.3 });
+            const xGantry = new THREE.Mesh(xGantryGeometry, xGantryMaterial);
+            xGantry.position.set(0, 2.8, 0); // Initial position
+            bioprinter.add(xGantry);
+
+            // Extruder Head (attached to the moving gantry)
+            const extruderBodyGeometry = new THREE.BoxGeometry(0.4, 0.8, 0.4);
+            const extruderMaterial = new THREE.MeshStandardMaterial({ color: 0x007bff, roughness: 0.4, metalness: 0.4 });
+            extruderHead = new THREE.Mesh(extruderBodyGeometry, extruderMaterial);
+
+            const nozzleGeometry = new THREE.CylinderGeometry(0.05, 0.1, 0.3, 8);
+            const nozzleMaterial = new THREE.MeshStandardMaterial({ color: 0xaaaaaa, roughness: 0.3, metalness: 0.5 });
+            const nozzle = new THREE.Mesh(nozzleGeometry, nozzleMaterial);
+            nozzle.position.y = -0.55; // Below the extruder body
+            extruderHead.add(nozzle);
+
+            extruderHead.position.set(0, EXTRUDER_HEIGHT_OFFSET, 0); // Initial position relative to the printer
+            bioprinter.add(extruderHead);
+
+            // Printed Object Group and Points Visualization
+            printedObject = new THREE.Group();
+            scene.add(printedObject);
+
+            // Pre-allocate buffer for printed points
+            printedPointsGeometry = new THREE.BufferGeometry();
+            const positions = new Float32Array(MAX_PRINT_POINTS * 3); // 3 components per vertex (x, y, z)
+            printedPointsGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            printedPointsGeometry.setDrawRange(0, 0); // Start with no points drawn
+
+            const printedPointsMaterial = new THREE.PointsMaterial({ color: 0x00ff00, size: 0.05 }); // Green material
+            printedPointsMesh = new THREE.Points(printedPointsGeometry, printedPointsMaterial);
+            printedObject.add(printedPointsMesh);
+
+            // Handle window resize
+            window.addEventListener('resize', onWindowResize, false);
+
+            // Add button event listeners
+            document.getElementById('startButton').addEventListener('click', startPrint);
+            document.getElementById('stopButton').addEventListener('click', stopPrint);
+            document.getElementById('toggleManualControl').addEventListener('click', toggleManualControl);
+            document.getElementById('resetPrintButton').addEventListener('click', resetPrint);
+            document.getElementById('simulateErrorButton').addEventListener('click', () => showMessageBox("Error: Nozzle clogged! Please clear the nozzle."));
+
+            // Camera preset buttons
+            document.getElementById('resetViewButton').addEventListener('click', resetView);
+            document.getElementById('frontViewButton').addEventListener('click', () => setCameraView(0, 5, BED_SIZE + 2));
+            document.getElementById('topViewButton').addEventListener('click', () => setCameraView(0, BED_SIZE + 5, 0));
+            document.getElementById('isometricViewButton').addEventListener('click', () => setCameraView(BED_SIZE + 2, BED_SIZE + 2, BED_SIZE + 2));
+
+            // Slider and input event listeners
+            const printSpeedSlider = document.getElementById('printSpeedSlider');
+            const printSpeedValue = document.getElementById('printSpeedValue');
+            printSpeedSlider.addEventListener('input', (event) => {
+                printSpeed = parseFloat(event.target.value);
+                printSpeedValue.textContent = printSpeed.toFixed(3);
+            });
+            printSpeedValue.textContent = printSpeed.toFixed(3); // Initial value
+
+            const layerHeightSlider = document.getElementById('layerHeightSlider');
+            const layerHeightValue = document.getElementById('layerHeightValue');
+            layerHeightSlider.addEventListener('input', (event) => {
+                layerHeight = parseFloat(event.target.value);
+                layerHeightValue.textContent = layerHeight.toFixed(2);
+            });
+            layerHeightValue.textContent = layerHeight.toFixed(2); // Initial value
+
+            const totalLayersInput = document.getElementById('totalLayersInput');
+            totalLayersInput.addEventListener('input', (event) => {
+                totalLayers = parseInt(event.target.value);
+                if (isNaN(totalLayers) || totalLayers < 1) {
+                    totalLayers = 1;
+                    totalLayersInput.value = 1;
+                }
+            });
+
+            const printModelSelect = document.getElementById('printModelSelect');
+            printModelSelect.addEventListener('change', (event) => {
+                currentPrintModel = event.target.value;
+                resetPrint(); // Reset print when model changes
+                showMessageBox(`Selected model: ${currentPrintModel}`);
+            });
+
+            // Keyboard controls for manual movement
+            window.addEventListener('keydown', onKeyDown, false);
+
+            // Message box close button
+            document.getElementById('message-box-close').addEventListener('click', hideMessageBox);
+        }
+
+        // Function to handle window resizing
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // Function to generate path points for different models
+        function generatePathForModel(model, progress) {
+            const points = [];
+            const bedHalf = BED_SIZE / 2 - 0.2; // Slightly smaller to stay within bed
+            const currentY = EXTRUDER_HEIGHT_OFFSET + currentLayer * layerHeight;
+
+            if (model === 'spiral') {
+                const maxRadius = bedHalf * 0.9;
+                const segmentsPerRotation = 100;
+                const totalRotations = 4;
+                const totalSegments = segmentsPerRotation * totalRotations;
+
+                for (let i = 0; i <= segmentsPerRotation; i++) {
+                    const segmentProgress = i / segmentsPerRotation;
+                    const radius = segmentProgress * maxRadius;
+                    const angle = segmentProgress * Math.PI * 2; // One full rotation
+
+                    const x = radius * Math.cos(angle);
+                    const z = radius * Math.sin(angle);
+                    points.push(new THREE.Vector3(x, currentY, z));
+                }
+            } else if (model === 'cube') {
+                const size = bedHalf * 0.8;
+                const halfSize = size / 2;
+                // Simple square path for each layer
+                points.push(new THREE.Vector3(-halfSize, currentY, -halfSize));
+                points.push(new THREE.Vector3(halfSize, currentY, -halfSize));
+                points.push(new THREE.Vector3(halfSize, currentY, halfSize));
+                points.push(new THREE.Vector3(-halfSize, currentY, halfSize));
+                points.push(new THREE.Vector3(-halfSize, currentY, -halfSize)); // Close the square
+            } else if (model === 'sphere') {
+                const radius = bedHalf * 0.7;
+                const numSegments = 60;
+                // For a sphere, each layer is a circle
+                // The radius of the circle changes based on the layer's height relative to the sphere's center
+                const sphereCenterY = EXTRUDER_HEIGHT_OFFSET + (totalLayers * layerHeight) / 2;
+                const relativeLayerHeight = (currentLayer * layerHeight) - (totalLayers * layerHeight) / 2;
+                const currentCircleRadius = Math.sqrt(Math.max(0, radius * radius - relativeLayerHeight * relativeLayerHeight));
+
+                for (let i = 0; i <= numSegments; i++) {
+                    const angle = (i / numSegments) * Math.PI * 2;
+                    const x = currentCircleRadius * Math.cos(angle);
+                    const z = currentCircleRadius * Math.sin(angle);
+                    points.push(new THREE.Vector3(x, currentY, z));
+                }
+            } else if (model === 'cylinder') {
+                const radius = bedHalf * 0.8;
+                const numSegments = 60;
+                // For a cylinder, each layer is a constant circle
+                for (let i = 0; i <= numSegments; i++) {
+                    const angle = (i / numSegments) * Math.PI * 2;
+                    const x = radius * Math.cos(angle);
+                    const z = radius * Math.sin(angle);
+                    points.push(new THREE.Vector3(x, currentY, z));
+                }
+            }
+            return points;
+        }
+
+        // Animation loop
+        function animate() {
+            animationId = requestAnimationFrame(animate);
+
+            if (isPrinting && !manualControlMode) {
+                if (currentPathPoints.length === 0) {
+                    // Generate path for the current layer if not already generated
+                    currentPathPoints = generatePathForModel(currentPrintModel, currentLayer);
+                    printProgress = 0; // Reset progress for the new layer
+                    if (currentPathPoints.length === 0) {
+                        // If no points generated (e.g., sphere at extreme layers), move to next layer
+                        currentLayer++;
+                        if (currentLayer >= totalLayers) {
+                            stopPrint();
+                            showMessageBox("Print complete!");
+                        }
+                        return;
+                    }
+                }
+
+                printProgress += printSpeed;
+
+                if (printProgress >= 1) {
+                    // Current layer finished, move to next layer
+                    printProgress = 1; // Ensure last point is reached
+                    const lastPoint = currentPathPoints[currentPathPoints.length - 1];
+                    extruderHead.position.copy(lastPoint);
+                    addPointToPrintedMesh(lastPoint.x, lastPoint.y, lastPoint.z); // Add last point
+
+                    currentLayer++;
+                    if (currentLayer >= totalLayers) {
+                        stopPrint();
+                        showMessageBox("Print complete!");
+                    } else {
+                        // Prepare for next layer
+                        currentPathPoints = []; // Clear points for next layer generation
+                        printProgress = 0;
+                        // Move extruder up to next layer's starting height
+                        extruderHead.position.y = EXTRUDER_HEIGHT_OFFSET + currentLayer * layerHeight;
+                    }
+                } else {
+                    // Interpolate position along the current path
+                    const pathIndex = Math.floor(printProgress * (currentPathPoints.length - 1));
+                    if (pathIndex < currentPathPoints.length - 1) {
+                        const p1 = currentPathPoints[pathIndex];
+                        const p2 = currentPathPoints[pathIndex + 1];
+                        const segmentProgress = (printProgress * (currentPathPoints.length - 1)) - pathIndex;
+
+                        const interpolatedX = p1.x + (p2.x - p1.x) * segmentProgress;
+                        const interpolatedY = p1.y + (p2.y - p1.y) * segmentProgress;
+                        const interpolatedZ = p1.z + (p2.z - p1.z) * segmentProgress;
+
+                        extruderHead.position.set(interpolatedX, interpolatedY, interpolatedZ);
+                        addPointToPrintedMesh(interpolatedX, interpolatedY, interpolatedZ);
+                    }
+                }
+            }
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        let printedPointCount = 0;
+        function addPointToPrintedMesh(x, y, z) {
+            if (printedPointCount < MAX_PRINT_POINTS) {
+                const positions = printedPointsGeometry.attributes.position.array;
+                const index = printedPointCount * 3;
+                positions[index] = x;
+                // Adjusted vertical offset from 0.05 to 0.01 to decrease distance from nozzle
+                positions[index + 1] = y - EXTRUDER_HEIGHT_OFFSET + 0.01; 
+                positions[index + 2] = z;
+                printedPointCount++;
+                printedPointsGeometry.setDrawRange(0, printedPointCount);
+                printedPointsGeometry.attributes.position.needsUpdate = true;
+            } else {
+                // Buffer full, consider increasing MAX_PRINT_POINTS or implementing a rolling buffer
+                console.warn("Printed points buffer full. Increase MAX_PRINT_POINTS.");
+            }
+        }
+
+        // Start print animation
+        function startPrint() {
+            if (manualControlMode) {
+                showMessageBox("Cannot start automated print in manual control mode. Toggle manual control off first.");
+                return;
+            }
+            isPrinting = true;
+            // Removed: showMessageBox("Printing started!");
+        }
+
+        // Stop print animation
+        function stopPrint() {
+            isPrinting = false;
+            // Removed: showMessageBox("Printing stopped.");
+        }
+
+        // Toggle manual control mode
+        function toggleManualControl() {
+            manualControlMode = !manualControlMode;
+            isPrinting = false; // Stop automated printing if manual mode is enabled
+            showMessageBox(`Manual control: ${manualControlMode ? 'ON' : 'OFF'}`);
+            if (manualControlMode) {
+                showMessageBox("Use WASD for X/Z movement, Q/E for Y movement.");
+            }
+        }
+
+        // Reset print simulation
+        function resetPrint() {
+            stopPrint();
+            printProgress = 0;
+            currentLayer = 0;
+            currentPathPoints = [];
+
+            // Clear printed mesh
+            printedPointCount = 0;
+            printedPointsGeometry.setDrawRange(0, 0);
+            printedPointsGeometry.attributes.position.needsUpdate = true;
+
+            // Reset extruder position
+            extruderHead.position.set(0, EXTRUDER_HEIGHT_OFFSET, 0);
+            showMessageBox("Print simulation reset.");
+        }
+
+        // Reset camera view
+        function resetView() {
+            controls.reset();
+            showMessageBox("Camera view reset.");
+        }
+
+        // Set camera to a specific view
+        function setCameraView(x, y, z) {
+            camera.position.set(x, y, z);
+            controls.target.set(0, 0, 0); // Look at the center of the bed
+            controls.update();
+            showMessageBox("Camera view changed.");
+        }
+
+        // Keyboard event handler for manual control
+        function onKeyDown(event) {
+            if (!manualControlMode) return;
+
+            const moveAmount = 0.1; // How much to move per key press
+            const currentX = extruderHead.position.x;
+            const currentY = extruderHead.position.y;
+            const currentZ = extruderHead.position.z;
+
+            switch (event.key.toLowerCase()) {
+                case 'w': // Move Z-
+                    extruderHead.position.z = Math.max(-BED_SIZE / 2, currentZ - moveAmount);
+                    break;
+                case 's': // Move Z+
+                    extruderHead.position.z = Math.min(BED_SIZE / 2, currentZ + moveAmount);
+                    break;
+                case 'a': // Move X-
+                    extruderHead.position.x = Math.max(-BED_SIZE / 2, currentX - moveAmount);
+                    break;
+                case 'd': // Move X+
+                    extruderHead.position.x = Math.min(BED_SIZE / 2, currentX + moveAmount);
+                    break;
+                case 'q': // Move Y- (down)
+                    extruderHead.position.y = Math.max(0.1, currentY - moveAmount); // Prevent going below bed
+                    break;
+                case 'e': // Move Y+ (up)
+                    extruderHead.position.y = Math.min(EXTRUDER_HEIGHT_OFFSET + totalLayers * layerHeight + 0.5, currentY + moveAmount); // Max height
+                    break;
+            }
+            // In manual mode, we can also "print" by adding points where the head moves
+            addPointToPrintedMesh(extruderHead.position.x, extruderHead.position.y, extruderHead.position.z);
+        }
+
+        // Custom Message Box functions
+        function showMessageBox(message) {
+            const messageBoxOverlay = document.getElementById('message-box-overlay');
+            const messageBoxContent = document.getElementById('message-box-content');
+            messageBoxContent.textContent = message;
+            messageBoxOverlay.classList.add('visible');
+        }
+
+        function hideMessageBox() {
+            const messageBoxOverlay = document.getElementById('message-box-overlay');
+            messageBoxOverlay.classList.remove('visible');
+        }
+
+        // Initialize and start animation when the window loads
+        window.onload = function () {
+            init();
+            animate();
+        };
+    </script>
+</body>
+</html>
